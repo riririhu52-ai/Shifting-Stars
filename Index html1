@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Shifter</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+height:100vh;
+overflow:hidden;
+display:flex;
+justify-content:center;
+align-items:center;
+background:radial-gradient(circle at top,#1b2250,#050816 70%);
+color:white;
+}
+
+.stars{
+position:absolute;
+width:100%;
+height:100%;
+background:url('https://www.transparenttextures.com/patterns/stardust.png');
+animation:moveStars 100s linear infinite;
+opacity:0.7;
+}
+
+@keyframes moveStars{
+from{transform:translateY(0);}
+to{transform:translateY(-1000px);}
+}
+
+.game{
+position:relative;
+z-index:2;
+text-align:center;
+padding:10px;
+}
+
+h1{
+font-size:3rem;
+margin-bottom:15px;
+letter-spacing:5px;
+color:#8be9fd;
+text-shadow:0 0 20px #00f7ff;
+animation:glow 2s infinite alternate;
+}
+
+@keyframes glow{
+from{
+text-shadow:0 0 10px #00f7ff;
+}
+to{
+text-shadow:0 0 30px #00f7ff;
+}
+}
+
+.score{
+margin-bottom:15px;
+font-size:1.2rem;
+padding:10px 20px;
+background:rgba(255,255,255,0.08);
+border-radius:15px;
+backdrop-filter:blur(10px);
+box-shadow:0 0 15px rgba(0,255,255,0.4);
+}
+
+.board{
+width:95vw;
+height:95vw;
+max-width:480px;
+max-height:480px;
+display:grid;
+grid-template-columns:repeat(8,1fr);
+gap:5px;
+padding:10px;
+background:rgba(255,255,255,0.05);
+border-radius:20px;
+box-shadow:0 0 35px rgba(0,255,255,0.25);
+}
+
+.tile{
+width:100%;
+height:100%;
+aspect-ratio:1/1;
+border-radius:12px;
+cursor:pointer;
+transition:0.2s;
+box-shadow:0 0 15px rgba(255,255,255,0.3);
+}
+
+.tile:hover{
+transform:scale(1.08);
+}
+
+.red{
+background:linear-gradient(135deg,#ff4d6d,#ff758f);
+}
+
+.blue{
+background:linear-gradient(135deg,#00c6ff,#0072ff);
+}
+
+.green{
+background:linear-gradient(135deg,#00ff87,#60efff);
+}
+
+.yellow{
+background:linear-gradient(135deg,#ffe259,#ffa751);
+}
+
+.purple{
+background:linear-gradient(135deg,#c471f5,#fa71cd);
+}
+
+.explode{
+animation:explode 0.4s forwards;
+}
+
+@keyframes explode{
+0%{
+transform:scale(1);
+opacity:1;
+}
+50%{
+transform:scale(1.4);
+opacity:0.7;
+}
+100%{
+transform:scale(0);
+opacity:0;
+}
+}
+
+.combo{
+position:absolute;
+top:20px;
+left:50%;
+transform:translateX(-50%);
+font-size:2rem;
+font-weight:bold;
+color:#00f7ff;
+text-shadow:0 0 20px #00f7ff;
+opacity:0;
+pointer-events:none;
+animation:comboPop 1s ease;
+}
+
+@keyframes comboPop{
+0%{
+opacity:0;
+transform:translateX(-50%) scale(0.5);
+}
+30%{
+opacity:1;
+transform:translateX(-50%) scale(1.2);
+}
+100%{
+opacity:0;
+transform:translateX(-50%) scale(1);
+}
+}
+
+button{
+margin-top:20px;
+padding:12px 28px;
+border:none;
+border-radius:12px;
+background:#00e5ff;
+font-size:1rem;
+font-weight:bold;
+cursor:pointer;
+transition:0.3s;
+}
+
+button:hover{
+transform:scale(1.05);
+box-shadow:0 0 20px #00e5ff;
+}
+
+@media(max-width:600px){
+h1{
+font-size:2rem;
+}
+}
+</style>
+</head>
+
+<body>
+
+<audio autoplay loop>
+<source src="https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3" type="audio/mpeg">
+</audio>
+
+<div class="stars"></div>
+
+<div class="game">
+
+<h1>STAR SHIFTER</h1>
+
+<div class="score">
+⭐ Score: <span id="score">0</span>
+</div>
+
+<div id="comboText"></div>
+
+<div class="board" id="board"></div>
+
+<button onclick="restartGame()">Restart Game</button>
+
+</div>
+
+<script>
+const board=document.getElementById('board');
+const scoreDisplay=document.getElementById('score');
+const comboText=document.getElementById('comboText');
+
+const width=8;
+
+const colors=[
+'red',
+'blue',
+'green',
+'yellow',
+'purple'
+];
+
+let squares=[];
+let score=0;
+
+function randomColor(){
+return colors[Math.floor(Math.random()*colors.length)];
+}
+
+function createBoard(){
+
+board.innerHTML='';
+squares=[];
+
+for(let i=0;i<width*width;i++){
+
+const square=document.createElement('div');
+
+square.classList.add('tile');
+
+const color=randomColor();
+
+square.classList.add(color);
+
+square.setAttribute('draggable',true);
+
+square.setAttribute('id',i);
+
+board.appendChild(square);
+
+squares.push(square);
+
+}
+
+addDragEvents();
+}
+
+let colorDragged;
+let colorReplaced;
+let squareDraggedId;
+let squareReplacedId;
+
+function dragStart(){
+
+colorDragged=this.classList[1];
+
+squareDraggedId=parseInt(this.id);
+
+}
+
+function dragDrop(){
+
+colorReplaced=this.classList[1];
+
+squareReplacedId=parseInt(this.id);
+
+this.classList.remove(colorReplaced);
+
+this.classList.add(colorDragged);
+
+squares[squareDraggedId].classList.remove(colorDragged);
+
+squares[squareDraggedId].classList.add(colorReplaced);
+
+}
+
+function dragEnd(){
+
+const validMoves=[
+squareDraggedId-1,
+squareDraggedId+1,
+squareDraggedId-width,
+squareDraggedId+width
+];
+
+const validMove=validMoves.includes(squareReplacedId);
+
+if(!validMove){
+
+squares[squareDraggedId].classList.remove(colorReplaced);
+
+squares[squareDraggedId].classList.add(colorDragged);
+
+squares[squareReplacedId].classList.remove(colorDragged);
+
+squares[squareReplacedId].classList.add(colorReplaced);
+
+}
+
+}
+
+function addDragEvents(){
+
+squares.forEach(square=>{
+
+square.addEventListener('dragstart',dragStart);
+
+square.addEventListener('dragover',e=>e.preventDefault());
+
+square.addEventListener('drop',dragDrop);
+
+square.addEventListener('dragend',dragEnd);
+
+});
+
+}
+
+function showCombo(){
+
+comboText.className='combo';
+
+comboText.innerText='COSMIC COMBO ✨';
+
+setTimeout(()=>{
+comboText.className='';
+},1000);
+
+}
+
+function checkMatches(){
+
+for(let i=0;i<61;i++){
+
+const color=squares[i].classList[1];
+
+if(
+color &&
+squares[i+1].classList[1]===color &&
+squares[i+2].classList[1]===color
+){
+
+[i,i+1,i+2].forEach(index=>{
+
+squares[index].classList.add('explode');
+
+setTimeout(()=>{
+
+squares[index].className='tile '+randomColor();
+
+},300);
+
+});
+
+score+=10;
+
+scoreDisplay.textContent=score;
+
+showCombo();
+
+}
+
+}
+
+for(let i=0;i<47;i++){
+
+const color=squares[i].classList[1];
+
+if(
+color &&
+squares[i+width].classList[1]===color &&
+squares[i+width*2].classList[1]===color
+){
+
+[i,i+width,i+width*2].forEach(index=>{
+
+squares[index].classList.add('explode');
+
+setTimeout(()=>{
+
+squares[index].className='tile '+randomColor();
+
+},300);
+
+});
+
+score+=10;
+
+scoreDisplay.textContent=score;
+
+showCombo();
+
+}
+
+}
+
+}
+
+function restartGame(){
+
+score=0;
+
+scoreDisplay.textContent=0;
+
+createBoard();
+
+}
+
+createBoard();
+
+setInterval(()=>{
+
+checkMatches();
+
+},200);
+
+</script>
+
+</body>
+</html>
